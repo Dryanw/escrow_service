@@ -51,7 +51,12 @@ contract Escrow {
     }
 
     modifier agentOnly {
-        require(_agents.has(msg.sender));
+        require(_agents.has(msg.sender), 'only agents can call this function');
+        _;
+    }
+
+    modifier assignedAgent {
+        require(_agentToBuyer[msg.sender] != address(0), 'not assigned to any buyer yet');
         _;
     }
 
@@ -61,10 +66,12 @@ contract Escrow {
     }
 
     function register(address agent) public {
+        require(msg.sender == _seller);
         _agents.add(agent);
     }
 
     function createTask(address buyer, address agent, uint256 price, uint8 condition) public {
+        require(msg.sender == _seller, 'please create task through our website');
         require(_agents.has(agent), 'unknown agent');
         require(_agentToBuyer[agent] == address(0), 'agent is already occupied');
         _buyers.add(buyer);
@@ -80,20 +87,18 @@ contract Escrow {
     }
 
     function checkCondition(uint8 status) external agentOnly view returns (bool) {
-        address buyer = _agentToBuyer[msg.sender];
-        require(buyer != address(0));
-        return status >= _condition[buyer];
+        require(_agentToBuyer[msg.sender] != address(0), 'not assigned to any buyer yet');
+        return status >= _condition[_agentToBuyer[msg.sender]];
     }
 
-    function isFundReceived(address buyer) external agentOnly view returns (bool) {
-        require(_buyers.has(buyer), 'Unknown buyer');
-        return _fundReceived[buyer];
+    function isFundReceived() external agentOnly view returns (bool) {
+        require(_agentToBuyer[msg.sender] != address(0), 'not assigned to any buyer yet');
+        return _fundReceived[_agentToBuyer[msg.sender]];
     }
 
-    function release(bool valid) external payable agentOnly {
+    function release(bool valid) external payable agentOnly assignedAgent {
         address buyer = _agentToBuyer[msg.sender];
         address receiver;
-        require(buyer != address(0));
         if (valid) {
             receiver = _seller;
         } else {
@@ -102,6 +107,7 @@ contract Escrow {
         require(_fundReceived[buyer], 'no fund received from buyer yet');
         payable(receiver).transfer(_prices[buyer]);
         payable(msg.sender).transfer(_fee);
-
+        _agentToBuyer[msg.sender] = address(0);
+        _chosenAgent[buyer] = address(0);
     }
 }
