@@ -61,7 +61,6 @@ contract Escrow {
     }
 
     function register(address agent) public {
-        require(msg.sender == _seller);
         _agents.add(agent);
     }
 
